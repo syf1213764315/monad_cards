@@ -1,0 +1,343 @@
+/* 资格卡片样式 */
+.check-eligibility-section {
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.check-button {
+    background: linear-gradient(135deg, #6e54ff 0%, #8038ee 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(110, 84, 255, 0.3);
+}
+
+.check-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(110, 84, 255, 0.4);
+    background: linear-gradient(135deg, #7f68ff 0%, #9149ff 100%);
+}
+
+.check-button:active {
+    transform: translateY(0);
+}
+
+.result-container {
+    margin-top: 30px;
+    min-height: 400px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.qualification-card {
+    opacity: 0;
+    transform: scale(0.9) translateY(20px);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+    max-width: 600px;
+}
+
+.qualification-card.show {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.card-header {
+    position: relative;
+    background: linear-gradient(135deg, #0D0A17 0%, #181133 100%);
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.card-glow {
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(128, 56, 238, 0.3) 0%, transparent 70%);
+    animation: glow-pulse 3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes glow-pulse {
+    0%, 100% {
+        opacity: 0.5;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.1);
+    }
+}
+
+.card-border {
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 2px;
+    background: linear-gradient(135deg, #957FFC, #6e54ff, #8038ee);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: border-rotate 4s linear infinite;
+}
+
+@keyframes border-rotate {
+    0% {
+        background: linear-gradient(135deg, #957FFC, #6e54ff, #8038ee);
+    }
+    33% {
+        background: linear-gradient(135deg, #8038ee, #957FFC, #6e54ff);
+    }
+    66% {
+        background: linear-gradient(135deg, #6e54ff, #8038ee, #957FFC);
+    }
+    100% {
+        background: linear-gradient(135deg, #957FFC, #6e54ff, #8038ee);
+    }
+}
+
+.card-content {
+    position: relative;
+    padding: 30px;
+    z-index: 1;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #00A63E 0%, #00D94F 100%);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px rgba(0, 166, 62, 0.3);
+    animation: badge-glow 2s ease-in-out infinite;
+}
+
+@keyframes badge-glow {
+    0%, 100% {
+        box-shadow: 0 4px 10px rgba(0, 166, 62, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(0, 166, 62, 0.5);
+    }
+}
+
+.check-icon {
+    width: 18px;
+    height: 18px;
+    animation: check-draw 0.5s ease-out forwards;
+}
+
+@keyframes check-draw {
+    0% {
+        stroke-dasharray: 0 100;
+    }
+    100% {
+        stroke-dasharray: 100 0;
+    }
+}
+
+.user-info {
+    margin-bottom: 25px;
+}
+
+.username {
+    color: #7258FF;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    background: linear-gradient(135deg, #7258FF 0%, #957FFC 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.congrats-message {
+    color: #C9BFFF;
+    font-size: 18px;
+    margin: 0;
+    animation: fade-in 0.5s ease-out 0.3s both;
+}
+
+@keyframes fade-in {
+    0% {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card-details {
+    background: rgba(149, 127, 252, 0.1);
+    border: 1px solid rgba(149, 127, 252, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    animation: fade-in 0.5s ease-out 0.4s both;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.detail-label {
+    color: #957FFC;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.detail-value {
+    color: #C9BFFF;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.detail-value.qualified {
+    color: #00D94F;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 25px;
+    animation: fade-in 0.5s ease-out 0.5s both;
+}
+
+.claim-button,
+.share-button {
+    flex: 1;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: none;
+}
+
+.claim-button.primary {
+    background: linear-gradient(135deg, #6e54ff 0%, #8038ee 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(110, 84, 255, 0.3);
+}
+
+.claim-button.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(110, 84, 255, 0.4);
+    background: linear-gradient(135deg, #7f68ff 0%, #9149ff 100%);
+}
+
+.share-button {
+    background: transparent;
+    color: #957FFC;
+    border: 2px solid #957FFC;
+}
+
+.share-button:hover {
+    background: rgba(149, 127, 252, 0.1);
+    border-color: #C9BFFF;
+    color: #C9BFFF;
+    transform: translateY(-2px);
+}
+
+.card-footer {
+    text-align: center;
+    padding-top: 20px;
+    border-top: 1px solid rgba(149, 127, 252, 0.2);
+    animation: fade-in 0.5s ease-out 0.6s both;
+}
+
+.footer-text {
+    color: #C9BFFF;
+    font-size: 14px;
+    margin: 0 0 10px 0;
+    font-style: italic;
+}
+
+.sparkles {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+
+.sparkle {
+    color: #957FFC;
+    font-size: 20px;
+    animation: sparkle 2s ease-in-out infinite;
+}
+
+.sparkle:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.sparkle:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.sparkle:nth-child(3) {
+    animation-delay: 0.6s;
+}
+
+@keyframes sparkle {
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1) rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 600px) {
+    .card-content {
+        padding: 20px;
+    }
+    
+    .username {
+        font-size: 20px;
+    }
+    
+    .congrats-message {
+        font-size: 16px;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .card-details {
+        grid-template-columns: 1fr;
+    }
+}

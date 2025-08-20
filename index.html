@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monad Cards - 资格检查</title>
+    <link rel="stylesheet" href="qualification-card.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #080613 0%, #181133 100%);
+            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: #C9BFFF;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: fade-in-down 0.8s ease-out;
+        }
+        
+        @keyframes fade-in-down {
+            0% {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .logo {
+            width: 150px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6e54ff 0%, #957FFC 50%, #C9BFFF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 20px;
+            color: #957FFC;
+            margin-bottom: 30px;
+        }
+        
+        .input-section {
+            background: rgba(13, 10, 23, 0.8);
+            border: 1px solid #957FFC;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            animation: fade-in-up 0.8s ease-out 0.2s both;
+        }
+        
+        @keyframes fade-in-up {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .input-label {
+            display: block;
+            color: #C9BFFF;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        .input-wrapper {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        #twitter-username {
+            flex: 1;
+            min-width: 250px;
+            background: rgba(8, 6, 19, 0.8);
+            border: 2px solid #292046;
+            border-radius: 25px;
+            color: #C9BFFF;
+            padding: 12px 20px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        #twitter-username::placeholder {
+            color: #3f395a;
+        }
+        
+        #twitter-username:focus {
+            outline: none;
+            border-color: #6e54ff;
+            box-shadow: 0 0 0 3px rgba(110, 84, 255, 0.2);
+        }
+        
+        .at-symbol {
+            position: absolute;
+            left: 20px;
+            color: #957FFC;
+            font-size: 18px;
+            pointer-events: none;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 50px;
+            animation: fade-in 1s ease-out 0.6s both;
+        }
+        
+        @keyframes fade-in {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+        
+        .feature-card {
+            background: rgba(13, 10, 23, 0.8);
+            border: 1px solid rgba(149, 127, 252, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            border-color: #957FFC;
+            box-shadow: 0 10px 30px rgba(110, 84, 255, 0.2);
+        }
+        
+        .feature-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+        
+        .feature-title {
+            color: #957FFC;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .feature-description {
+            color: #C9BFFF;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #957FFC;
+            font-size: 14px;
+        }
+        
+        .footer a {
+            color: #C9BFFF;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer a:hover {
+            color: #6e54ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <svg class="logo" viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg">
+                <text x="50%" y="50%" text-anchor="middle" dy=".35em" fill="url(#gradient)" font-size="40" font-weight="bold">MONAD</text>
+                <defs>
+                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#6e54ff;stop-opacity:1" />
+                        <stop offset="50%" style="stop-color:#957FFC;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#C9BFFF;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+            </svg>
+            <h1>Monad Cards 资格检查</h1>
+            <p class="subtitle">🎉 每个人都有资格获得 Monad Card！</p>
+        </div>
+        
+        <div class="input-section check-eligibility-section">
+            <label class="input-label" for="twitter-username">输入您的用户名进行验证</label>
+            <div class="input-wrapper">
+                <div style="position: relative; flex: 1; min-width: 250px;">
+                    <span class="at-symbol">@</span>
+                    <input 
+                        type="text" 
+                        id="twitter-username" 
+                        placeholder="请输入用户名" 
+                        style="padding-left: 40px;"
+                    />
+                </div>
+                <button class="check-button" onclick="checkQualification()">
+                    检查资格
+                </button>
+            </div>
+            <div id="result-container" class="result-container"></div>
+        </div>
+        
+        <div class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🏆</div>
+                <div class="feature-title">独家权益</div>
+                <div class="feature-description">获得 Monad 生态系统的独家访问权限和特殊待遇</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌟</div>
+                <div class="feature-title">社区认证</div>
+                <div class="feature-description">成为 Monad 社区的认证成员，享受专属身份标识</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎁</div>
+                <div class="feature-title">限量奖励</div>
+                <div class="feature-description">获得限量版 NFT 和其他独特的数字资产</div>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <div class="feature-title">早期访问</div>
+                <div class="feature-description">优先体验新功能和参与独家活动</div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>© 2025 Monad Foundation | <a href="#">隐私政策</a> | <a href="#">服务条款</a></p>
+        </div>
+    </div>
+    
+    <script>
+        // 检查资格函数 - 始终返回有资格
+        function checkQualification() {
+            const inputField = document.getElementById('twitter-username');
+            const username = inputField.value.trim() || '尊贵的用户';
+            const container = document.getElementById('result-container');
+            
+            // 清空之前的结果
+            container.innerHTML = '';
+            
+            // 创建资格卡片
+            const card = createQualificationCard(username);
+            container.appendChild(card);
+            
+            // 添加显示动画
+            setTimeout(() => {
+                card.classList.add('show');
+            }, 100);
+        }
+        
+        // 创建资格卡片
+        function createQualificationCard(username) {
+            const card = document.createElement('div');
+            card.className = 'qualification-card';
+            
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-glow"></div>
+                    <div class="card-border"></div>
+                    <div class="card-content">
+                        <div class="status-badge">
+                            <svg class="check-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 6 9 17l-5-5"></path>
+                            </svg>
+                            <span>有资格</span>
+                        </div>
+                        
+                        <div class="user-info">
+                            <h3 class="username">@${username}</h3>
+                            <p class="congrats-message">🎉 恭喜！您有资格获得 Monad Card</p>
+                        </div>
+                        
+                        <div class="card-details">
+                            <div class="detail-item">
+                                <span class="detail-label">状态</span>
+                                <span class="detail-value qualified">已通过验证 ✓</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Wave</span>
+                                <span class="detail-value">第一波优先</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">权益等级</span>
+                                <span class="detail-value">钻石级</span>
+                            </div>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="claim-button primary" onclick="alert('🎉 恭喜！您的 Monad Card 正在准备中...')">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                立即领取
+                            </button>
+                            <button class="share-button" onclick="alert('分享功能即将推出！')">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M18 8a3 3 0 100-6 3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6zM8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                分享喜讯
+                            </button>
+                        </div>
+                        
+                        <div class="card-footer">
+                            <p class="footer-text">✨ 您是被选中的特殊成员之一 ✨</p>
+                            <div class="sparkles">
+                                <span class="sparkle">✦</span>
+                                <span class="sparkle">✦</span>
+                                <span class="sparkle">✦</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            return card;
+        }
+        
+        // 绑定回车键事件
+        document.getElementById('twitter-username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkQualification();
+            }
+        });
+        
+        // 页面加载时的欢迎动画
+        window.addEventListener('load', function() {
+            const inputField = document.getElementById('twitter-username');
+            inputField.focus();
+        });
+    </script>
+</body>
+</html>

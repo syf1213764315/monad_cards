@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试 - Monad Cards 资格检查</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .test-case {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .test-input {
+            font-weight: bold;
+            color: #6e54ff;
+        }
+        .test-result {
+            color: #00A63E;
+            margin-top: 5px;
+        }
+        .iframe-container {
+            width: 100%;
+            height: 800px;
+            border: 2px solid #6e54ff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .success {
+            color: #00A63E;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Monad Cards 资格检查系统测试</h1>
+    
+    <div class="test-section">
+        <div class="test-title">测试说明</div>
+        <p>本系统已配置为：<strong class="success">无论输入什么内容，都会显示"有资格"状态</strong></p>
+        <p>以下是一些测试用例，您可以在下方的实际页面中尝试：</p>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">测试用例</div>
+        
+        <div class="test-case">
+            <div class="test-input">输入: testuser123</div>
+            <div class="test-result">预期结果: ✅ 显示有资格，展示精美的资格卡片</div>
+        </div>
+        
+        <div class="test-case">
+            <div class="test-input">输入: 张三</div>
+            <div class="test-result">预期结果: ✅ 显示有资格，展示精美的资格卡片</div>
+        </div>
+        
+        <div class="test-case">
+            <div class="test-input">输入: (留空)</div>
+            <div class="test-result">预期结果: ✅ 显示"尊贵的用户"有资格，展示精美的资格卡片</div>
+        </div>
+        
+        <div class="test-case">
+            <div class="test-input">输入: !@#$%^&*()</div>
+            <div class="test-result">预期结果: ✅ 显示有资格，展示精美的资格卡片</div>
+        </div>
+        
+        <div class="test-case">
+            <div class="test-input">输入: VeryLongUserNameThatExceedsNormalLength123456789</div>
+            <div class="test-result">预期结果: ✅ 显示有资格，展示精美的资格卡片</div>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">实际页面测试</div>
+        <p>在下方的嵌入页面中输入任何内容进行测试：</p>
+        <div class="iframe-container">
+            <iframe src="index.html"></iframe>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <div class="test-title">功能特性</div>
+        <ul>
+            <li>✅ 所有输入都显示"有资格"状态</li>
+            <li>✅ 精美的渐变动画效果</li>
+            <li>✅ 发光边框和脉冲动画</li>
+            <li>✅ 响应式设计，适配各种屏幕</li>
+            <li>✅ 交互按钮（领取和分享）</li>
+            <li>✅ 支持回车键快速检查</li>
+            <li>✅ 空输入时显示默认用户名</li>
+        </ul>
+    </div>
+    
+    <script>
+        console.log('测试页面加载完成');
+        console.log('系统配置：所有输入都会显示有资格状态');
+    </script>
+</body>
+</html>
