@@ -211,7 +211,7 @@ class UniswapService:
                 "stateMutability": "payable",
                 "type": "function"
             },
-            # unwrapWETH9 - 解包WETH
+            # unwrapWETH9 - 解包WMON（在Monad网络上）
             {
                 "inputs": [
                     {"internalType": "uint256", "name": "amountMinimum", "type": "uint256"},
@@ -230,7 +230,7 @@ class UniswapService:
                 "stateMutability": "payable",
                 "type": "function"
             },
-            # WETH9 - 获取WETH地址
+            # WETH9 - 获取WMON地址（在Monad网络上可能不可用）
             {
                 "inputs": [],
                 "name": "WETH9",
@@ -722,28 +722,10 @@ class UniswapService:
             }
     
     def get_weth_address(self):
-        """动态获取WETH地址"""
-        try:
-            # 尝试从Router合约获取WETH地址
-            router_contract = self.w3.eth.contract(
-                address=self.w3.to_checksum_address(self.uniswap_v3_router),
-                abi=self.router_abi
-            )
-            
-            # 尝试调用WETH9函数获取WETH地址
-            try:
-                weth_address = router_contract.functions.WETH9().call()
-                logger.info(f"从Router获取到WETH地址: {weth_address}")
-                return weth_address
-            except Exception as e:
-                logger.warning(f"无法从Router获取WETH地址: {e}")
-            
-            # 如果失败，返回配置的地址
-            return self.weth_address
-            
-        except Exception as e:
-            logger.error(f"获取WETH地址失败: {e}")
-            return self.weth_address
+        """获取WMON地址（Monad网络的Wrapped MON）"""
+        # 对于Monad网络，直接返回WMON地址
+        # 不需要从Router获取，因为Monad使用的是WMON而不是WETH
+        return self.weth_address  # 这里self.weth_address实际上存储的是WMON地址
     
     def execute_swap(self, private_key: str, token_address: str, amount_in: float,
                     trade_type: str, slippage: float = 5.0) -> Dict[str, Any]:
@@ -798,10 +780,11 @@ class UniswapService:
             try:
                 logger.info("验证Uniswap V3 Router合约...")
                 
-                # 检查合约代码是否存在
-                code = self.w3.eth.get_code(router_address)
+                # 检查合约代码是否存在 - 使用checksum地址
+                checksum_router = self.w3.to_checksum_address(router_address)
+                code = self.w3.eth.get_code(checksum_router)
                 if code == b'' or len(code) < 100:
-                    raise ValueError(f"Router地址 {router_address} 没有有效的合约代码")
+                    raise ValueError(f"Router地址 {checksum_router} 没有有效的合约代码")
                 logger.info(f"Router合约代码长度: {len(code)} bytes")
                 
             except Exception as e:
@@ -816,48 +799,10 @@ class UniswapService:
             if self.use_native_token and trade_type == "buy":
                 logger.info("Monad网络原生MON交易")
                 
-                # 对于买入操作，需要将MON包装成WMON
-                # UniversalRouter 支持直接使用原生代币
-                if "universal" in router_address.lower() or router_address.lower() == "0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893":
-                    logger.info("使用UniversalRouter处理原生代币")
-                    
-                    # 对于UniversalRouter，我们需要使用multicall包装WMON和swap
-                    deadline = self.w3.eth.get_block('latest').timestamp + 1200
-                    amount_in_wei = self.w3.to_wei(amount_in, 'ether')
-                    
-                    # 方案1: 使用multicall组合wrapETH和exactInputSingle
-                    # 首先编码wrapETH调用（实际上UniversalRouter可能不支持）
-                    # 方案2: 直接使用exactInputSingle，并在value中发送ETH
-                    
-                    # 构建exactInputSingle参数，使用WMON作为tokenIn
-                    swap_params = {
-                        'tokenIn': weth_address,  # WMON地址
-                        'tokenOut': checksum_token_address,
-                        'fee': 3000,  # 0.3%
-                        'recipient': wallet_address,
-                        'deadline': deadline,
-                        'amountIn': amount_in_wei,
-                        'amountOutMinimum': 0,
-                        'sqrtPriceLimitX96': 0
-                    }
-                    
-                    # 尝试直接调用exactInputSingle，同时发送ETH
-                    # UniversalRouter应该会自动处理ETH到WMON的转换
-                    try:
-                        transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
-                            'from': wallet_address,
-                            'value': amount_in_wei,  # 发送原生MON
-                            'gas': 300000,
-                            'gasPrice': self.w3.eth.gas_price,
-                            'nonce': self.w3.eth.get_transaction_count(wallet_address),
-                            'chainId': self.chain_id
-                        })
-                        logger.info("使用UniversalRouter的exactInputSingle处理原生代币")
-                    except Exception as e:
-                        logger.warning(f"UniversalRouter exactInputSingle失败: {e}")
-                        # 如果失败，回退到标准的WMON包装方案
-                        raise ValueError("UniversalRouter调用失败，请使用标准Router")
-                    
+                # 在Monad网络上，直接使用标准的WMON包装方案
+                # 因为UniversalRouter可能不完全兼容
+                if False:  # 暂时禁用UniversalRouter
+                    pass
                 else:
                     # 使用标准的SwapRouter，需要先将MON包装成WMON
                     logger.info("需要先将MON包装成WMON")
