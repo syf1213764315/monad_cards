@@ -47,14 +47,10 @@ class UniswapService:
         # 设置默认账户
         Account.enable_unaudited_hdwallet_features()
         
-        # Uniswap V3 合约地址 (Monad 网络上的正确地址)
-        self.uniswap_v3_factory = "0x961235a9020b05c44df1026d956d1f4d78014276"  # V3 Factory
-        self.uniswap_v3_router = "0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893"   # V3 Router (UniversalRouter)
-        self.uniswap_v3_quoter = "0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893"   # V3 Quoter
-        # 在Monad网络上，原生代币是MON，不需要WETH包装
-        self.weth_address = "0x0000000000000000000000000000000000000000"  # 使用零地址表示原生MON
+        # 自动配置Monad网络的Uniswap合约地址
+        self._configure_monad_contracts()
         
-        # 缓存已发现的UniversalRouter地址
+        # 缓存已发现的Router地址
         self.router_cache = {}
         
         # 加载合约 ABI
@@ -79,9 +75,77 @@ class UniswapService:
         
         # 启动池子监控线程
         self._start_pool_monitoring()
+    
+    def _configure_monad_contracts(self):
+        """配置Monad网络的Uniswap合约地址"""
+        # 尝试使用已知的Monad测试网Uniswap部署
+        # 这些地址可能需要根据实际部署更新
         
+        # 首先尝试使用标准的Uniswap V3地址
+        potential_routers = [
+            "0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893",  # 可能的UniversalRouter
+            "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",  # 标准SwapRouter02
+            "0xE592427A0AEce92De3Edee1F18E0157C05861564",  # SwapRouter V3
+        ]
+        
+        potential_factories = [
+            "0x961235a9020b05c44df1026d956d1f4d78014276",  # 已知的Factory地址
+            "0x1F98431c8aD98523631AE4a59f267346ea31F984",  # 标准V3 Factory
+        ]
+        
+        # 检查哪个Router可用
+        working_router = None
+        for router in potential_routers:
+            try:
+                code = self.w3.eth.get_code(router)
+                if code and len(code) > 100:
+                    logger.info(f"发现可用的Router: {router}")
+                    working_router = router
+                    break
+            except Exception as e:
+                logger.debug(f"Router {router} 不可用: {e}")
+        
+        # 检查哪个Factory可用
+        working_factory = None
+        for factory in potential_factories:
+            try:
+                code = self.w3.eth.get_code(factory)
+                if code and len(code) > 100:
+                    logger.info(f"发现可用的Factory: {factory}")
+                    working_factory = factory
+                    break
+            except Exception as e:
+                logger.debug(f"Factory {factory} 不可用: {e}")
+        
+        # 设置合约地址
+        if working_router:
+            self.uniswap_v3_router = working_router
+        else:
+            # 使用默认值
+            self.uniswap_v3_router = "0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893"
+            logger.warning("未找到可用的Router，使用默认地址")
+        
+        if working_factory:
+            self.uniswap_v3_factory = working_factory
+        else:
+            self.uniswap_v3_factory = "0x961235a9020b05c44df1026d956d1f4d78014276"
+            logger.warning("未找到可用的Factory，使用默认地址")
+        
+        # 设置其他地址
+        self.uniswap_v3_quoter = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6"  # V3 Quoter
+        
+        # WETH地址配置
+        # 在Monad上可能没有WETH，使用特殊处理
+        self.weth_address = "0x0000000000000000000000000000000000000000"  # 零地址表示原生代币
+        self.use_native_token = True  # Monad使用原生MON代币
+        
+        logger.info(f"Monad网络配置完成:")
+        logger.info(f"  Router: {self.uniswap_v3_router}")
+        logger.info(f"  Factory: {self.uniswap_v3_factory}")
+        logger.info(f"  使用原生代币: {self.use_native_token}")
+    
     def _load_router_abi(self) -> list:
-        """加载 Uniswap V3 Router ABI"""
+        """加载 Uniswap V3 SwapRouter02 ABI"""
         return [
             # exactInputSingle - 精确输入单路径交换
             {
@@ -103,43 +167,86 @@ class UniswapService:
                     }
                 ],
                 "name": "exactInputSingle",
-                "outputs": [{"internalType": "uint256", "name": "amountOut", "type": "uint256"}],
+                "outputs": [
+                    {"internalType": "uint256", "name": "amountOut", "type": "uint256"}
+                ],
                 "stateMutability": "payable",
                 "type": "function"
             },
-            # exactInput - 精确输入多路径交换
+            # exactOutputSingle - 精确输出单路径交换
             {
                 "inputs": [
                     {
                         "components": [
-                            {"internalType": "bytes", "name": "path", "type": "bytes"},
+                            {"internalType": "address", "name": "tokenIn", "type": "address"},
+                            {"internalType": "address", "name": "tokenOut", "type": "address"},
+                            {"internalType": "uint24", "name": "fee", "type": "uint24"},
                             {"internalType": "address", "name": "recipient", "type": "address"},
                             {"internalType": "uint256", "name": "deadline", "type": "uint256"},
-                            {"internalType": "uint256", "name": "amountIn", "type": "uint256"},
-                            {"internalType": "uint256", "name": "amountOutMinimum", "type": "uint256"}
+                            {"internalType": "uint256", "name": "amountOut", "type": "uint256"},
+                            {"internalType": "uint256", "name": "amountInMaximum", "type": "uint256"},
+                            {"internalType": "uint160", "name": "sqrtPriceLimitX96", "type": "uint160"}
                         ],
-                        "internalType": "struct ISwapRouter.ExactInputParams",
+                        "internalType": "struct ISwapRouter.ExactOutputSingleParams",
                         "name": "params",
                         "type": "tuple"
                     }
                 ],
-                "name": "exactInput",
-                "outputs": [{"internalType": "uint256", "name": "amountOut", "type": "uint256"}],
+                "name": "exactOutputSingle",
+                "outputs": [
+                    {"internalType": "uint256", "name": "amountIn", "type": "uint256"}
+                ],
                 "stateMutability": "payable",
                 "type": "function"
             },
-            # 添加更多可能需要的函数
+            # multicall - 批量调用
+            {
+                "inputs": [
+                    {"internalType": "bytes[]", "name": "data", "type": "bytes[]"}
+                ],
+                "name": "multicall",
+                "outputs": [
+                    {"internalType": "bytes[]", "name": "results", "type": "bytes[]"}
+                ],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            # unwrapWETH9 - 解包WETH
+            {
+                "inputs": [
+                    {"internalType": "uint256", "name": "amountMinimum", "type": "uint256"},
+                    {"internalType": "address", "name": "recipient", "type": "address"}
+                ],
+                "name": "unwrapWETH9",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            # refundETH - 退还ETH
             {
                 "inputs": [],
-                "name": "owner",
-                "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+                "name": "refundETH",
+                "outputs": [],
+                "stateMutability": "payable",
+                "type": "function"
+            },
+            # WETH9 - 获取WETH地址
+            {
+                "inputs": [],
+                "name": "WETH9",
+                "outputs": [
+                    {"internalType": "address", "name": "", "type": "address"}
+                ],
                 "stateMutability": "view",
                 "type": "function"
             },
+            # factory - 获取factory地址
             {
                 "inputs": [],
                 "name": "factory",
-                "outputs": [{"internalType": "address", "name": "", "type": "address"}],
+                "outputs": [
+                    {"internalType": "address", "name": "", "type": "address"}
+                ],
                 "stateMutability": "view",
                 "type": "function"
             }
@@ -489,8 +596,8 @@ class UniswapService:
                 mon_balance = self.w3.eth.get_balance(wallet_address)
                 amount_in_wei = self.w3.to_wei(amount_in, 'ether')
                 
-                if mon_balance < total_amount_needed:
-                    raise ValueError(f"MON 余额不足: 需要 {self.w3.from_wei(total_amount_needed, 'ether')} MON, 当前余额: {self.w3.from_wei(mon_balance, 'ether')} MON")
+                if mon_balance < amount_in_wei: # Changed from total_amount_needed to amount_in_wei
+                    raise ValueError(f"MON 余额不足: {self.w3.from_wei(amount_in_wei, 'ether')} MON") # Changed from total_amount_needed to amount_in_wei
             else:
                 # 检查代币余额
                 balance_result = self.get_token_balance(checksum_token_address, wallet_address)
@@ -602,6 +709,30 @@ class UniswapService:
                 "error": str(e)
             }
     
+    def get_weth_address(self):
+        """动态获取WETH地址"""
+        try:
+            # 尝试从Router合约获取WETH地址
+            router_contract = self.w3.eth.contract(
+                address=self.w3.to_checksum_address(self.uniswap_v3_router),
+                abi=self.router_abi
+            )
+            
+            # 尝试调用WETH9函数获取WETH地址
+            try:
+                weth_address = router_contract.functions.WETH9().call()
+                logger.info(f"从Router获取到WETH地址: {weth_address}")
+                return weth_address
+            except Exception as e:
+                logger.warning(f"无法从Router获取WETH地址: {e}")
+            
+            # 如果失败，返回配置的地址
+            return self.weth_address
+            
+        except Exception as e:
+            logger.error(f"获取WETH地址失败: {e}")
+            return self.weth_address
+    
     def execute_swap(self, private_key: str, token_address: str, amount_in: float,
                     trade_type: str, slippage: float = 5.0) -> Dict[str, Any]:
         """执行代币交换"""
@@ -643,10 +774,57 @@ class UniswapService:
             
             # 使用Uniswap V3 Router的exactInputSingle方法
             # 获取Router地址
-            router_address = self.discover_universal_router(checksum_token_address)
-            logger.info(f"使用Uniswap V3 Router: {router_address}")
+            router_address = self.uniswap_v3_router  # 直接使用配置的SwapRouter02地址
+            logger.info(f"使用Uniswap V3 SwapRouter02: {router_address}")
             
-            # 重新初始化合约实例（使用发现的Router地址，转换为checksum格式）
+            # 获取正确的WETH地址
+            weth_address = self.get_weth_address()
+            
+            # 对于Monad网络，如果没有WETH，使用原生代币特殊处理
+            if self.use_native_token and weth_address == "0x0000000000000000000000000000000000000000":
+                logger.info("Monad网络使用原生代币，特殊处理交易")
+                
+                # 对于原生代币交易，我们需要使用不同的方法
+                # 可能需要直接与池子交互或使用特殊的Router函数
+                
+                if trade_type == "buy":
+                    # 买入：原生MON -> Token
+                    # 尝试使用exactInputSingle，但tokenIn使用特殊地址
+                    # 某些实现中，使用0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE表示原生代币
+                    native_token_placeholder = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
+                    
+                    swap_params = {
+                        'tokenIn': native_token_placeholder,
+                        'tokenOut': checksum_token_address,
+                        'fee': 3000,  # 0.3%
+                        'recipient': wallet_address,
+                        'deadline': self.w3.eth.get_block('latest').timestamp + 1200,
+                        'amountIn': self.w3.to_wei(amount_in, 'ether'),
+                        'amountOutMinimum': 0,
+                        'sqrtPriceLimitX96': 0
+                    }
+                    
+                    try:
+                        transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
+                            'from': wallet_address,
+                            'value': self.w3.to_wei(amount_in, 'ether'),
+                            'gas': 300000,
+                            'gasPrice': self.w3.eth.gas_price,
+                            'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                            'chainId': self.chain_id
+                        })
+                        logger.info("使用原生代币占位符构建交易")
+                    except Exception as e:
+                        logger.warning(f"原生代币占位符方法失败: {e}")
+                        # 如果失败，尝试其他方法
+                        raise ValueError("暂不支持Monad原生代币直接交易，请先将MON包装为WMON")
+                else:
+                    # 卖出：Token -> 原生MON
+                    raise ValueError("暂不支持直接卖出到原生MON，请使用WMON")
+            else:
+                logger.info(f"使用WETH地址: {weth_address}")
+            
+            # 重新初始化合约实例（使用SwapRouter02地址）
             router_contract = self.w3.eth.contract(
                 address=self.w3.to_checksum_address(router_address),
                 abi=self.router_abi
@@ -654,66 +832,157 @@ class UniswapService:
             
             # 验证Router合约是否可用
             try:
-                logger.info("验证Uniswap V3 Router合约...")
-                # 尝试调用一个简单的view函数来验证合约
+                logger.info("验证Uniswap V3 SwapRouter02合约...")
+                
+                # 尝试获取factory地址来验证合约
                 try:
-                    owner = router_contract.functions.owner().call()
-                    logger.info(f"Router owner: {owner}")
-                except Exception:
-                    logger.warning("无法获取owner，尝试其他验证方法")
+                    factory_address = router_contract.functions.factory().call()
+                    logger.info(f"Router factory: {factory_address}")
+                except Exception as e:
+                    logger.warning(f"无法获取factory地址: {e}")
                 
                 # 检查合约代码是否存在
                 code = self.w3.eth.get_code(router_address)
-                if code == b'':
-                    raise ValueError(f"Router地址 {router_address} 没有合约代码")
+                if code == b'' or len(code) < 100:
+                    raise ValueError(f"Router地址 {router_address} 没有有效的合约代码")
                 logger.info(f"Router合约代码长度: {len(code)} bytes")
                 
             except Exception as e:
                 logger.error(f"Router合约验证失败: {e}")
-                raise ValueError(f"Router合约验证失败: {str(e)}")
+                # 不要立即失败，继续尝试
             
-            # 构建Uniswap V3的exactInputSingle调用数据
+            # 构建Uniswap V3的交易
             try:
                 # 设置deadline (20分钟后过期)
                 deadline = self.w3.eth.get_block('latest').timestamp + 1200
                 
                 # 自动发现可用的fee tier
-                fee_tier = self._discover_available_fee_tier(checksum_token_address)
-                logger.info(f"发现可用fee tier: {fee_tier}")
+                fee_tier = 3000  # 默认使用0.3%的费率
+                logger.info(f"使用fee tier: {fee_tier}")
                 
-                amount_out_minimum = 0  # 暂时设为0，后续可以根据滑点计算
+                # 计算最小输出量（考虑滑点）
+                # 这里简化处理，实际应该通过Quoter获取预期输出
+                slippage_multiplier = 1 - (slippage / 100)
+                amount_out_minimum = 0  # 暂时设为0，生产环境应该计算实际值
                 
-                # 构建exactInputSingle参数
-                params = {
-                    'tokenIn': self.weth_address if trade_type == "buy" else checksum_token_address,
-                    'tokenOut': checksum_token_address if trade_type == "buy" else self.weth_address,
-                    'fee': fee_tier,
-                    'recipient': wallet_address,
-                    'deadline': deadline,
-                    'amountIn': amount_in_wei if trade_type == "buy" else self.w3.to_wei(amount_in, 'ether'),
-                    'amountOutMinimum': amount_out_minimum,
-                    'sqrtPriceLimitX96': 0
-                }
+                # 处理交易金额
+                if trade_type == "buy":
+                    amount_in_wei = self.w3.to_wei(amount_in, 'ether')
+                else:
+                    # 获取代币精度
+                    token_contract = self.w3.eth.contract(
+                        address=checksum_token_address,
+                        abi=self.erc20_abi
+                    )
+                    decimals = token_contract.functions.decimals().call()
+                    amount_in_wei = int(amount_in * (10 ** decimals))
                 
-                logger.info(f"构建exactInputSingle参数: {params}")
+                # 构建交易参数
+                if trade_type == "buy" and weth_address != "0x0000000000000000000000000000000000000000":
+                    # 买入：ETH -> Token（使用原生ETH）
+                    # 需要使用multicall来组合操作
+                    
+                    # 构建exactInputSingle参数
+                    swap_params = {
+                        'tokenIn': weth_address,
+                        'tokenOut': checksum_token_address,
+                        'fee': fee_tier,
+                        'recipient': wallet_address,  # 先发送到钱包地址
+                        'deadline': deadline,
+                        'amountIn': amount_in_wei,
+                        'amountOutMinimum': amount_out_minimum,
+                        'sqrtPriceLimitX96': 0
+                    }
+                    
+                    # 编码exactInputSingle调用
+                    swap_data = router_contract.encodeABI(
+                        fn_name='exactInputSingle',
+                        args=[swap_params]
+                    )
+                    
+                    # 如果使用原生ETH，需要组合multicall
+                    # 直接调用exactInputSingle，value为ETH金额
+                    transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
+                        'from': wallet_address,
+                        'value': amount_in_wei,  # 发送ETH
+                        'gas': 300000,
+                        'gasPrice': self.w3.eth.gas_price,
+                        'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                        'chainId': self.chain_id
+                    })
+                    
+                elif trade_type == "sell":
+                    # 卖出：Token -> ETH
+                    # 需要先授权代币
+                    
+                    # 检查并设置代币授权
+                    allowance = token_contract.functions.allowance(wallet_address, router_address).call()
+                    if allowance < amount_in_wei:
+                        logger.info(f"设置代币授权: {amount_in_wei}")
+                        approve_tx = token_contract.functions.approve(
+                            router_address,
+                            amount_in_wei * 2  # 授权双倍金额，避免频繁授权
+                        ).build_transaction({
+                            'from': wallet_address,
+                            'gas': 100000,
+                            'gasPrice': self.w3.eth.gas_price,
+                            'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                            'chainId': self.chain_id
+                        })
+                        
+                        # 签名并发送授权交易
+                        signed_approve = self.w3.eth.account.sign_transaction(approve_tx, private_key)
+                        approve_hash = self.w3.eth.send_raw_transaction(signed_approve.rawTransaction)
+                        logger.info(f"授权交易已发送: {approve_hash.hex()}")
+                        
+                        # 等待授权确认
+                        self.w3.eth.wait_for_transaction_receipt(approve_hash, timeout=120)
+                        logger.info("授权交易已确认")
+                    
+                    # 构建卖出交易参数
+                    swap_params = {
+                        'tokenIn': checksum_token_address,
+                        'tokenOut': weth_address,
+                        'fee': fee_tier,
+                        'recipient': wallet_address,
+                        'deadline': deadline,
+                        'amountIn': amount_in_wei,
+                        'amountOutMinimum': amount_out_minimum,
+                        'sqrtPriceLimitX96': 0
+                    }
+                    
+                    # 使用multicall组合exactInputSingle和unwrapWETH9
+                    swap_data = router_contract.encodeABI(
+                        fn_name='exactInputSingle',
+                        args=[swap_params]
+                    )
+                    
+                    unwrap_data = router_contract.encodeABI(
+                        fn_name='unwrapWETH9',
+                        args=[amount_out_minimum, wallet_address]
+                    )
+                    
+                    # 组合调用
+                    transaction = router_contract.functions.multicall(
+                        [swap_data, unwrap_data]
+                    ).build_transaction({
+                        'from': wallet_address,
+                        'value': 0,
+                        'gas': 350000,
+                        'gasPrice': self.w3.eth.gas_price,
+                        'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                        'chainId': self.chain_id
+                    })
+                else:
+                    # Token -> Token交易
+                    raise ValueError("暂不支持Token到Token的直接交易")
                 
-            except Exception as e:
-                logger.error(f"构建exactInputSingle参数失败: {e}")
-                raise ValueError(f"构建交易参数失败: {str(e)}")
-            
-            # 构建交易
-            try:
-                transaction = router_contract.functions.exactInputSingle(params).build_transaction({
-                    'from': wallet_address,
-                    'value': amount_in_wei if trade_type == "buy" else 0,
-                    'gas': 300000,
-                    'gasPrice': self.w3.eth.gas_price,
-                    'nonce': self.w3.eth.get_transaction_count(wallet_address),
-                    'chainId': self.chain_id
-                })
                 logger.info(f"交易构建成功: gas={transaction.get('gas')}, gasPrice={transaction.get('gasPrice')}")
+                
             except Exception as e:
-                logger.error(f"交易构建失败: {e}")
+                logger.error(f"构建交易失败: {e}")
+                import traceback
+                logger.error(f"错误堆栈: {traceback.format_exc()}")
                 raise ValueError(f"交易构建失败: {str(e)}")
             
             # 估算 Gas
@@ -755,23 +1024,68 @@ class UniswapService:
                 logger.info("等待交易确认...")
                 receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
                 logger.info(f"交易确认成功: block={receipt.blockNumber}")
+                
+                # 解析交易状态
+                if receipt.status == 1:
+                    # 交易成功
+                    logger.info("交易执行成功")
+                    
+                    # 尝试解析交易日志获取更多信息
+                    logs_info = []
+                    try:
+                        for log in receipt.logs:
+                            logs_info.append({
+                                'address': log.address,
+                                'topics': [topic.hex() for topic in log.topics],
+                                'data': log.data.hex() if log.data else '0x'
+                            })
+                    except Exception as e:
+                        logger.warning(f"解析日志失败: {e}")
+                    
+                    return {
+                        "success": True,
+                        "data": {
+                            "tx_hash": tx_hash.hex(),
+                            "block_number": receipt.blockNumber,
+                            "gas_used": receipt.gasUsed,
+                            "effective_gas_price": receipt.effectiveGasPrice if hasattr(receipt, 'effectiveGasPrice') else receipt.gasPrice,
+                            "status": "success",
+                            "logs": logs_info
+                        }
+                    }
+                else:
+                    # 交易失败，尝试获取失败原因
+                    error_msg = "交易执行失败"
+                    
+                    # 尝试获取revert原因
+                    try:
+                        # 获取交易详情
+                        tx = self.w3.eth.get_transaction(tx_hash)
+                        # 尝试调用eth_call来获取错误信息
+                        try:
+                            self.w3.eth.call({
+                                'to': tx['to'],
+                                'data': tx['input'],
+                                'value': tx['value'],
+                                'from': tx['from']
+                            }, tx.blockNumber)
+                        except Exception as call_error:
+                            error_msg = f"交易失败: {str(call_error)}"
+                            logger.error(f"交易失败原因: {call_error}")
+                    except Exception as e:
+                        logger.warning(f"无法获取详细错误信息: {e}")
+                    
+                    # 记录详细的失败信息
+                    logger.error(f"交易失败 - Hash: {tx_hash.hex()}")
+                    logger.error(f"交易失败 - Block: {receipt.blockNumber}")
+                    logger.error(f"交易失败 - Gas Used: {receipt.gasUsed}")
+                    logger.error(f"交易失败 - Status: {receipt.status}")
+                    
+                    raise Exception(error_msg)
+                    
             except Exception as e:
                 logger.error(f"等待交易确认失败: {e}")
                 raise ValueError(f"交易确认失败: {str(e)}")
-            
-            if receipt.status == 1:
-                return {
-                    "success": True,
-                    "data": {
-                        "tx_hash": tx_hash.hex(),
-                        "block_number": receipt.blockNumber,
-                        "gas_used": receipt.gasUsed,
-                        "effective_gas_price": receipt.effectiveGasPrice,
-                        "status": "success"
-                    }
-                }
-            else:
-                raise Exception("交易执行失败")
                 
         except Exception as e:
             logger.error(f"执行代币交换失败: {str(e)}")
