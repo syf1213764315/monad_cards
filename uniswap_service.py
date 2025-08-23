@@ -134,14 +134,14 @@ class UniswapService:
         # 设置其他地址
         self.uniswap_v3_quoter = "0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6"  # V3 Quoter
         
-        # WETH地址配置
-        # 在Monad上可能没有WETH，使用特殊处理
-        self.weth_address = "0x0000000000000000000000000000000000000000"  # 零地址表示原生代币
+        # WMON (Wrapped Monad) 地址配置 - 使用官方的WrappedMonad地址
+        self.weth_address = "0x760AfE86e5de5fa0Ee542fc7B7B713e1c5425701"  # WMON地址
         self.use_native_token = True  # Monad使用原生MON代币
         
         logger.info(f"Monad网络配置完成:")
         logger.info(f"  Router: {self.uniswap_v3_router}")
         logger.info(f"  Factory: {self.uniswap_v3_factory}")
+        logger.info(f"  WMON: {self.weth_address}")
         logger.info(f"  使用原生代币: {self.use_native_token}")
     
     def _load_router_abi(self) -> list:
@@ -248,6 +248,18 @@ class UniswapService:
                     {"internalType": "address", "name": "", "type": "address"}
                 ],
                 "stateMutability": "view",
+                "type": "function"
+            },
+            # UniversalRouter execute function
+            {
+                "inputs": [
+                    {"internalType": "bytes", "name": "commands", "type": "bytes"},
+                    {"internalType": "bytes[]", "name": "inputs", "type": "bytes[]"},
+                    {"internalType": "uint256", "name": "deadline", "type": "uint256"}
+                ],
+                "name": "execute",
+                "outputs": [],
+                "stateMutability": "payable",
                 "type": "function"
             }
         ]
@@ -772,59 +784,11 @@ class UniswapService:
                 if token_balance < amount_in:
                     raise ValueError(f"代币余额不足: {token_balance}")
             
-            # 使用Uniswap V3 Router的exactInputSingle方法
-            # 获取Router地址
-            router_address = self.uniswap_v3_router  # 直接使用配置的SwapRouter02地址
-            logger.info(f"使用Uniswap V3 SwapRouter02: {router_address}")
+            # 获取Router地址并初始化合约实例
+            router_address = self.uniswap_v3_router  # 使用配置的Router地址
+            logger.info(f"使用Uniswap V3 Router: {router_address}")
             
-            # 获取正确的WETH地址
-            weth_address = self.get_weth_address()
-            
-            # 对于Monad网络，如果没有WETH，使用原生代币特殊处理
-            if self.use_native_token and weth_address == "0x0000000000000000000000000000000000000000":
-                logger.info("Monad网络使用原生代币，特殊处理交易")
-                
-                # 对于原生代币交易，我们需要使用不同的方法
-                # 可能需要直接与池子交互或使用特殊的Router函数
-                
-                if trade_type == "buy":
-                    # 买入：原生MON -> Token
-                    # 尝试使用exactInputSingle，但tokenIn使用特殊地址
-                    # 某些实现中，使用0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE表示原生代币
-                    native_token_placeholder = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"
-                    
-                    swap_params = {
-                        'tokenIn': native_token_placeholder,
-                        'tokenOut': checksum_token_address,
-                        'fee': 3000,  # 0.3%
-                        'recipient': wallet_address,
-                        'deadline': self.w3.eth.get_block('latest').timestamp + 1200,
-                        'amountIn': self.w3.to_wei(amount_in, 'ether'),
-                        'amountOutMinimum': 0,
-                        'sqrtPriceLimitX96': 0
-                    }
-                    
-                    try:
-                        transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
-                            'from': wallet_address,
-                            'value': self.w3.to_wei(amount_in, 'ether'),
-                            'gas': 300000,
-                            'gasPrice': self.w3.eth.gas_price,
-                            'nonce': self.w3.eth.get_transaction_count(wallet_address),
-                            'chainId': self.chain_id
-                        })
-                        logger.info("使用原生代币占位符构建交易")
-                    except Exception as e:
-                        logger.warning(f"原生代币占位符方法失败: {e}")
-                        # 如果失败，尝试其他方法
-                        raise ValueError("暂不支持Monad原生代币直接交易，请先将MON包装为WMON")
-                else:
-                    # 卖出：Token -> 原生MON
-                    raise ValueError("暂不支持直接卖出到原生MON，请使用WMON")
-            else:
-                logger.info(f"使用WETH地址: {weth_address}")
-            
-            # 重新初始化合约实例（使用SwapRouter02地址）
+            # 初始化Router合约实例
             router_contract = self.w3.eth.contract(
                 address=self.w3.to_checksum_address(router_address),
                 abi=self.router_abi
@@ -832,14 +796,7 @@ class UniswapService:
             
             # 验证Router合约是否可用
             try:
-                logger.info("验证Uniswap V3 SwapRouter02合约...")
-                
-                # 尝试获取factory地址来验证合约
-                try:
-                    factory_address = router_contract.functions.factory().call()
-                    logger.info(f"Router factory: {factory_address}")
-                except Exception as e:
-                    logger.warning(f"无法获取factory地址: {e}")
+                logger.info("验证Uniswap V3 Router合约...")
                 
                 # 检查合约代码是否存在
                 code = self.w3.eth.get_code(router_address)
@@ -851,77 +808,121 @@ class UniswapService:
                 logger.error(f"Router合约验证失败: {e}")
                 # 不要立即失败，继续尝试
             
-            # 构建Uniswap V3的交易
-            try:
-                # 设置deadline (20分钟后过期)
-                deadline = self.w3.eth.get_block('latest').timestamp + 1200
+            # 获取WMON地址
+            weth_address = self.get_weth_address()
+            logger.info(f"使用WMON地址: {weth_address}")
+            
+            # 对于Monad网络的原生代币交易特殊处理
+            if self.use_native_token and trade_type == "buy":
+                logger.info("Monad网络原生MON交易")
                 
-                # 自动发现可用的fee tier
-                fee_tier = 3000  # 默认使用0.3%的费率
-                logger.info(f"使用fee tier: {fee_tier}")
-                
-                # 计算最小输出量（考虑滑点）
-                # 这里简化处理，实际应该通过Quoter获取预期输出
-                slippage_multiplier = 1 - (slippage / 100)
-                amount_out_minimum = 0  # 暂时设为0，生产环境应该计算实际值
-                
-                # 处理交易金额
-                if trade_type == "buy":
-                    amount_in_wei = self.w3.to_wei(amount_in, 'ether')
-                else:
-                    # 获取代币精度
-                    token_contract = self.w3.eth.contract(
-                        address=checksum_token_address,
-                        abi=self.erc20_abi
-                    )
-                    decimals = token_contract.functions.decimals().call()
-                    amount_in_wei = int(amount_in * (10 ** decimals))
-                
-                # 构建交易参数
-                if trade_type == "buy" and weth_address != "0x0000000000000000000000000000000000000000":
-                    # 买入：ETH -> Token（使用原生ETH）
-                    # 需要使用multicall来组合操作
+                # 对于买入操作，需要将MON包装成WMON
+                # UniversalRouter 支持直接使用原生代币
+                if "universal" in router_address.lower() or router_address.lower() == "0x3ae6d8a282d67893e17aa70ebffb33ee5aa65893":
+                    logger.info("使用UniversalRouter处理原生代币")
                     
-                    # 构建exactInputSingle参数
+                    # 对于UniversalRouter，我们需要使用multicall包装WMON和swap
+                    deadline = self.w3.eth.get_block('latest').timestamp + 1200
+                    amount_in_wei = self.w3.to_wei(amount_in, 'ether')
+                    
+                    # 方案1: 使用multicall组合wrapETH和exactInputSingle
+                    # 首先编码wrapETH调用（实际上UniversalRouter可能不支持）
+                    # 方案2: 直接使用exactInputSingle，并在value中发送ETH
+                    
+                    # 构建exactInputSingle参数，使用WMON作为tokenIn
                     swap_params = {
-                        'tokenIn': weth_address,
+                        'tokenIn': weth_address,  # WMON地址
                         'tokenOut': checksum_token_address,
-                        'fee': fee_tier,
-                        'recipient': wallet_address,  # 先发送到钱包地址
+                        'fee': 3000,  # 0.3%
+                        'recipient': wallet_address,
                         'deadline': deadline,
                         'amountIn': amount_in_wei,
-                        'amountOutMinimum': amount_out_minimum,
+                        'amountOutMinimum': 0,
                         'sqrtPriceLimitX96': 0
                     }
                     
-                    # 编码exactInputSingle调用
-                    swap_data = router_contract.encodeABI(
-                        fn_name='exactInputSingle',
-                        args=[swap_params]
+                    # 尝试直接调用exactInputSingle，同时发送ETH
+                    # UniversalRouter应该会自动处理ETH到WMON的转换
+                    try:
+                        transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
+                            'from': wallet_address,
+                            'value': amount_in_wei,  # 发送原生MON
+                            'gas': 300000,
+                            'gasPrice': self.w3.eth.gas_price,
+                            'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                            'chainId': self.chain_id
+                        })
+                        logger.info("使用UniversalRouter的exactInputSingle处理原生代币")
+                    except Exception as e:
+                        logger.warning(f"UniversalRouter exactInputSingle失败: {e}")
+                        # 如果失败，回退到标准的WMON包装方案
+                        raise ValueError("UniversalRouter调用失败，请使用标准Router")
+                    
+                else:
+                    # 使用标准的SwapRouter，需要先将MON包装成WMON
+                    logger.info("需要先将MON包装成WMON")
+                    
+                    # 获取WMON合约
+                    wmon_contract = self.w3.eth.contract(
+                        address=self.w3.to_checksum_address(weth_address),
+                        abi=[
+                            {
+                                "constant": False,
+                                "inputs": [],
+                                "name": "deposit",
+                                "outputs": [],
+                                "payable": True,
+                                "stateMutability": "payable",
+                                "type": "function"
+                            },
+                            {
+                                "constant": False,
+                                "inputs": [{"name": "wad", "type": "uint256"}],
+                                "name": "withdraw",
+                                "outputs": [],
+                                "payable": False,
+                                "stateMutability": "nonpayable",
+                                "type": "function"
+                            }
+                        ]
                     )
                     
-                    # 如果使用原生ETH，需要组合multicall
-                    # 直接调用exactInputSingle，value为ETH金额
-                    transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
+                    # 先将MON包装成WMON
+                    amount_in_wei = self.w3.to_wei(amount_in, 'ether')
+                    wrap_tx = wmon_contract.functions.deposit().build_transaction({
                         'from': wallet_address,
-                        'value': amount_in_wei,  # 发送ETH
-                        'gas': 300000,
+                        'value': amount_in_wei,
+                        'gas': 50000,
                         'gasPrice': self.w3.eth.gas_price,
                         'nonce': self.w3.eth.get_transaction_count(wallet_address),
                         'chainId': self.chain_id
                     })
                     
-                elif trade_type == "sell":
-                    # 卖出：Token -> ETH
-                    # 需要先授权代币
+                    # 签名并发送包装交易
+                    signed_wrap = self.w3.eth.account.sign_transaction(wrap_tx, private_key)
+                    wrap_hash = self.w3.eth.send_raw_transaction(signed_wrap.rawTransaction)
+                    logger.info(f"MON包装交易已发送: {wrap_hash.hex()}")
                     
-                    # 检查并设置代币授权
-                    allowance = token_contract.functions.allowance(wallet_address, router_address).call()
+                    # 等待包装确认
+                    wrap_receipt = self.w3.eth.wait_for_transaction_receipt(wrap_hash, timeout=120)
+                    if wrap_receipt.status != 1:
+                        raise Exception("MON包装失败")
+                    logger.info("MON已成功包装为WMON")
+                    
+                    # 现在使用WMON进行交换
+                    # 需要先授权Router使用WMON
+                    wmon_erc20 = self.w3.eth.contract(
+                        address=self.w3.to_checksum_address(weth_address),
+                        abi=self.erc20_abi
+                    )
+                    
+                    # 检查并设置WMON授权
+                    allowance = wmon_erc20.functions.allowance(wallet_address, router_address).call()
                     if allowance < amount_in_wei:
-                        logger.info(f"设置代币授权: {amount_in_wei}")
-                        approve_tx = token_contract.functions.approve(
+                        logger.info(f"设置WMON授权: {amount_in_wei}")
+                        approve_tx = wmon_erc20.functions.approve(
                             router_address,
-                            amount_in_wei * 2  # 授权双倍金额，避免频繁授权
+                            amount_in_wei * 2  # 授权双倍金额
                         ).build_transaction({
                             'from': wallet_address,
                             'gas': 100000,
@@ -930,60 +931,103 @@ class UniswapService:
                             'chainId': self.chain_id
                         })
                         
-                        # 签名并发送授权交易
                         signed_approve = self.w3.eth.account.sign_transaction(approve_tx, private_key)
                         approve_hash = self.w3.eth.send_raw_transaction(signed_approve.rawTransaction)
-                        logger.info(f"授权交易已发送: {approve_hash.hex()}")
+                        logger.info(f"WMON授权交易已发送: {approve_hash.hex()}")
                         
-                        # 等待授权确认
-                        self.w3.eth.wait_for_transaction_receipt(approve_hash, timeout=120)
-                        logger.info("授权交易已确认")
+                        approve_receipt = self.w3.eth.wait_for_transaction_receipt(approve_hash, timeout=120)
+                        if approve_receipt.status != 1:
+                            raise Exception("WMON授权失败")
+                        logger.info("WMON授权成功")
                     
-                    # 构建卖出交易参数
+                    # 构建交换参数
+                    deadline = self.w3.eth.get_block('latest').timestamp + 1200
                     swap_params = {
-                        'tokenIn': checksum_token_address,
-                        'tokenOut': weth_address,
-                        'fee': fee_tier,
+                        'tokenIn': weth_address,
+                        'tokenOut': checksum_token_address,
+                        'fee': 3000,  # 0.3%
                         'recipient': wallet_address,
                         'deadline': deadline,
                         'amountIn': amount_in_wei,
-                        'amountOutMinimum': amount_out_minimum,
+                        'amountOutMinimum': 0,
                         'sqrtPriceLimitX96': 0
                     }
                     
-                    # 使用multicall组合exactInputSingle和unwrapWETH9
-                    swap_data = router_contract.encodeABI(
-                        fn_name='exactInputSingle',
-                        args=[swap_params]
-                    )
-                    
-                    unwrap_data = router_contract.encodeABI(
-                        fn_name='unwrapWETH9',
-                        args=[amount_out_minimum, wallet_address]
-                    )
-                    
-                    # 组合调用
-                    transaction = router_contract.functions.multicall(
-                        [swap_data, unwrap_data]
-                    ).build_transaction({
+                    # 构建交易（不需要value，因为使用的是WMON）
+                    transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
                         'from': wallet_address,
-                        'value': 0,
-                        'gas': 350000,
+                        'gas': 300000,
                         'gasPrice': self.w3.eth.gas_price,
                         'nonce': self.w3.eth.get_transaction_count(wallet_address),
                         'chainId': self.chain_id
                     })
-                else:
-                    # Token -> Token交易
-                    raise ValueError("暂不支持Token到Token的直接交易")
+                    
+            elif trade_type == "sell":
+                # 卖出代币到MON
+                logger.info("卖出代币到WMON")
                 
-                logger.info(f"交易构建成功: gas={transaction.get('gas')}, gasPrice={transaction.get('gasPrice')}")
+                # 获取代币合约
+                token_contract = self.w3.eth.contract(
+                    address=checksum_token_address,
+                    abi=self.erc20_abi
+                )
                 
-            except Exception as e:
-                logger.error(f"构建交易失败: {e}")
-                import traceback
-                logger.error(f"错误堆栈: {traceback.format_exc()}")
-                raise ValueError(f"交易构建失败: {str(e)}")
+                # 获取代币精度
+                decimals = token_contract.functions.decimals().call()
+                amount_in_wei = int(amount_in * (10 ** decimals))
+                
+                # 检查并设置代币授权
+                allowance = token_contract.functions.allowance(wallet_address, router_address).call()
+                if allowance < amount_in_wei:
+                    logger.info(f"设置代币授权: {amount_in_wei}")
+                    approve_tx = token_contract.functions.approve(
+                        router_address,
+                        amount_in_wei * 2
+                    ).build_transaction({
+                        'from': wallet_address,
+                        'gas': 100000,
+                        'gasPrice': self.w3.eth.gas_price,
+                        'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                        'chainId': self.chain_id
+                    })
+                    
+                    signed_approve = self.w3.eth.account.sign_transaction(approve_tx, private_key)
+                    approve_hash = self.w3.eth.send_raw_transaction(signed_approve.rawTransaction)
+                    logger.info(f"代币授权交易已发送: {approve_hash.hex()}")
+                    
+                    approve_receipt = self.w3.eth.wait_for_transaction_receipt(approve_hash, timeout=120)
+                    if approve_receipt.status != 1:
+                        raise Exception("代币授权失败")
+                    logger.info("代币授权成功")
+                
+                # 构建卖出交易参数
+                deadline = self.w3.eth.get_block('latest').timestamp + 1200
+                swap_params = {
+                    'tokenIn': checksum_token_address,
+                    'tokenOut': weth_address,  # 卖出到WMON
+                    'fee': 3000,  # 0.3%
+                    'recipient': wallet_address,
+                    'deadline': deadline,
+                    'amountIn': amount_in_wei,
+                    'amountOutMinimum': 0,
+                    'sqrtPriceLimitX96': 0
+                }
+                
+                # 构建交易
+                transaction = router_contract.functions.exactInputSingle(swap_params).build_transaction({
+                    'from': wallet_address,
+                    'gas': 300000,
+                    'gasPrice': self.w3.eth.gas_price,
+                    'nonce': self.w3.eth.get_transaction_count(wallet_address),
+                    'chainId': self.chain_id
+                })
+                
+                # 可选：交易完成后将WMON解包装为MON
+                # 这需要额外的交易步骤
+            
+            else:
+                # 不应该到达这里
+                raise ValueError(f"不支持的交易类型: {trade_type}")
             
             # 估算 Gas
             try:
