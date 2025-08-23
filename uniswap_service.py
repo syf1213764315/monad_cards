@@ -660,9 +660,9 @@ class UniswapService:
             
             # 获取原始交易数据
             try:
-                raw_tx = signed_txn.rawTransaction
-            except AttributeError:
                 raw_tx = signed_txn.raw_transaction
+            except AttributeError:
+                raw_tx = signed_txn.rawTransaction
             
             # 创建定时任务
             task_id = f"task_{self.task_counter}"
@@ -845,7 +845,12 @@ class UniswapService:
                     
                     # 签名并发送包装交易
                     signed_wrap = self.w3.eth.account.sign_transaction(wrap_tx, private_key)
-                    wrap_hash = self.w3.eth.send_raw_transaction(signed_wrap.rawTransaction)
+                    # 兼容不同版本的web3.py
+                    try:
+                        raw_wrap_tx = signed_wrap.raw_transaction
+                    except AttributeError:
+                        raw_wrap_tx = signed_wrap.rawTransaction
+                    wrap_hash = self.w3.eth.send_raw_transaction(raw_wrap_tx)
                     logger.info(f"MON包装交易已发送: {wrap_hash.hex()}")
                     
                     # 等待包装确认
@@ -877,7 +882,12 @@ class UniswapService:
                         })
                         
                         signed_approve = self.w3.eth.account.sign_transaction(approve_tx, private_key)
-                        approve_hash = self.w3.eth.send_raw_transaction(signed_approve.rawTransaction)
+                        # 兼容不同版本的web3.py
+                        try:
+                            raw_approve_tx = signed_approve.raw_transaction
+                        except AttributeError:
+                            raw_approve_tx = signed_approve.rawTransaction
+                        approve_hash = self.w3.eth.send_raw_transaction(raw_approve_tx)
                         logger.info(f"WMON授权交易已发送: {approve_hash.hex()}")
                         
                         approve_receipt = self.w3.eth.wait_for_transaction_receipt(approve_hash, timeout=120)
@@ -937,7 +947,12 @@ class UniswapService:
                     })
                     
                     signed_approve = self.w3.eth.account.sign_transaction(approve_tx, private_key)
-                    approve_hash = self.w3.eth.send_raw_transaction(signed_approve.rawTransaction)
+                    # 兼容不同版本的web3.py
+                    try:
+                        raw_approve_tx = signed_approve.raw_transaction
+                    except AttributeError:
+                        raw_approve_tx = signed_approve.rawTransaction
+                    approve_hash = self.w3.eth.send_raw_transaction(raw_approve_tx)
                     logger.info(f"代币授权交易已发送: {approve_hash.hex()}")
                     
                     approve_receipt = self.w3.eth.wait_for_transaction_receipt(approve_hash, timeout=120)
@@ -996,9 +1011,9 @@ class UniswapService:
             
             # 发送交易 - 兼容不同版本的web3.py
             try:
-                raw_tx = signed_txn.rawTransaction
-            except AttributeError:
                 raw_tx = signed_txn.raw_transaction
+            except AttributeError:
+                raw_tx = signed_txn.rawTransaction
             
             try:
                 logger.info("发送交易...")
